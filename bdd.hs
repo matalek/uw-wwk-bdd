@@ -149,6 +149,25 @@ evalOp u1 u2 op =
     b1 = u1 == 1
     b2 = u2 == 1
 
+restrict :: BDDNode -> Variable -> Value -> BDDNode
+restrict bddNode j b =
+  restrictAux bddNode
+  where
+  -- restrictAux :: BDDNode -> BDDNode
+  restrictAux bn@(bdd, u) =
+    let
+      resLow = restrictAux (bdd, countLow bn)
+      resHigh = restrictAux (bdd, countHigh bn)
+      resLowHigh = restrictAux (fst resLow, countHigh bn)
+      newBDD = fst resLowHigh
+      v = countVar bn
+    in
+      if v > j then bn
+      else if v < j then mk (fst resLowHigh) v (snd resLow) (snd resLowHigh)
+           else if b == False then resLow
+                else resHigh
+
+
 countVar :: BDDNode -> Variable
 countVar ((t, _), u) = v
   where
@@ -178,6 +197,14 @@ satCount (bdd@(t, _), node) =
                 +  2^(countVar (bdd, countHigh (bdd, u)) - countVar (bdd, u) - 1)
                 * count (countHigh (bdd, u))
 
+anySat :: BDDNode -> [(Variable, Value)]
+anySat (bdd, u) =
+  if u == 0 then error "No truth-assignment exists"
+  else if u == 1 then []
+       else if countLow (bdd, u) == 0 then
+              ((countVar (bdd, u), True) : anySat (bdd, countHigh (bdd, u)))
+            else ((countVar (bdd, u), False) : anySat (bdd, countLow (bdd, u)))
+
 
 -- test for build
 test0 = And (Eq (Var 1) (Var 2)) (Eq (Var 3) (Var 4))
@@ -194,3 +221,7 @@ test12 = (fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, 
 --test21 = build $ Eq (Var 1) (Var 2)
 --test22 = build $ Eq (Var 3) (Var 4)
 -- you would have to keep additionally the number of variables in each bdd
+
+
+-- test for restrict
+test3 = Or (Eq (Var 1) (Var 2)) (Var 3)

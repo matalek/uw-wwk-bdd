@@ -5,11 +5,19 @@ type Value = Bool
 type Variable = Int
 type Node = Int
 type Edge = Maybe Int
-data BExp = Var Variable | Val Value | Neg BExp | And BExp BExp | Or BExp BExp deriving (Show, Eq)
+data BExp = Var Variable
+          | Val Value
+          | Neg BExp
+          | And BExp BExp
+          | Or BExp BExp
+          | Imp BExp BExp
+          | Eq BExp BExp
+          deriving (Show, Eq)
 
 type Triple = (Int, Edge, Edge)
 
 type BDD = (Map Int Triple, Map Triple Int)
+type BDDNode = (BDD, Node)
 
 mk :: BDD -> Int -> Node -> Node -> (BDD, Node)
 mk bdd@(t, h) i low high
@@ -17,7 +25,7 @@ mk bdd@(t, h) i low high
   | member (i, Just low, Just high) h = (bdd, h ! (i, Just low, Just high))
   | otherwise =
     let 
-      u = (fst $ findMax t) + 1
+      u = if size t > 0 then (fst $ findMax t) + 1 else 1
       newT = insert u (i, Just low, Just high) t
       newH = insert (i, Just low, Just high) u h
     in
@@ -31,7 +39,9 @@ assign (Var s) x v
   | otherwise = Var s
 assign (Neg e) x v = Neg $ assign e x v
 assign (And e1 e2) x v = And (assign e1 x v) (assign e2 x v)
-assign (Or e1 e2) x v = Or (assign e1 x v) (assign e2 x v) 
+assign (Or e1 e2) x v = Or (assign e1 x v) (assign e2 x v)
+assign (Imp e1 e2) x v = Imp (assign e1 x v) (assign e2 x v)
+assign (Eq e1 e2) x v = Eq (assign e1 x v) (assign e2 x v)
 
 -- Calculates the value of the expression, where all variables have assigned values
 calculate :: BExp -> Value
@@ -51,13 +61,27 @@ calculate (Or e1 e2) =
   in case (v1, v2) of
     (False, False) -> False
     _ -> True
+calculate (Imp e1 e2) =
+  calculate $ Or (Neg e1) e2
+calculate (Eq e1 e2) =
+  calculate $ And (Imp e1 e2) (Imp e2 e1)
 
 -- Assuming, that no values are assigned
 maxVar :: BExp -> Int
 maxVar (Var v) = v
+maxVar (Val v) = 0
 maxVar (Neg e) = maxVar e
 maxVar (Or e1 e2) = max (maxVar e1) $ maxVar e2
 maxVar (And e1 e2) = max (maxVar e1) $ maxVar e2
+maxVar (Imp e1 e2) = max (maxVar e1) $ maxVar e2
+maxVar (Eq e1 e2) = max (maxVar e1) $ maxVar e2
+
+
+initBDD :: Variable  -> BDD
+initBDD n =
+  (fromList [(0, v), (1, v)], Map.empty)
+  where
+    v = (n, Nothing, Nothing)
 
 build :: BExp -> BDD
 build b = let
@@ -80,10 +104,19 @@ buildAux b bdd@(t, h) i
 type Arr2D = Map (Node, Node) Node
 type Op = Bool -> Bool -> Bool
 
-apply :: BDD -> BDD -> Op -> Node -> Node -> (BDD, Node)
-apply b1 b2 op u1 u2 =
-  let (b, u, _) = app b1 b2 op u1 u2 (Map.empty, Map.empty) (Map.empty)
-  in (b, u)
+countVariables :: BDD -> Int
+countVariables (t, _) = maximum [v | (_, (v, _, _)) <- toList t]  
+
+apply :: BDDNode -> BDDNode -> Op -> BDDNode
+apply (b1, u1) (b2, u2) op =
+  (b, u)
+  where
+    n1 = countVariables b1
+    n2 = countVariables b2
+    n = max n1 n2
+    start = initBDD n
+    (b, u, _) = app b1 b2 op u1 u2 start (Map.empty)
+    
 
 app :: BDD -> BDD -> Op -> Node -> Node -> BDD ->  Arr2D -> (BDD, Node, Arr2D)
 app bdd1@(t1, h1) bdd2@(t2, h2) op u1 u2 res g =
@@ -97,8 +130,10 @@ app bdd1@(t1, h1) bdd2@(t2, h2) op u1 u2 res g =
   in
     (res', u', insert (u1, u2) u' g')
   where
-    (v1, Just high1, Just low1) = t1 ! u1
-    (v2, Just high2, Just low2) = t2 ! u2
+    (v1, _, _) = t1 ! u1
+    (v2, _, _) = t2 ! u2
+    (_, Just low1, Just high1) = t1 ! u1
+    (_, Just low2, Just high2) = t2 ! u2
     mkApp w a1 a2 b1 b2 =
       let
         (res1, w1, g1) = app bdd1 bdd2 op a1 a2 res g
@@ -114,4 +149,18 @@ evalOp u1 u2 op =
     b1 = u1 == 1
     b2 = u2 == 1
 
-test = Or (Var 1) (Var 3)
+-- test for build
+test0 = And (Eq (Var 1) (Var 2)) (Eq (Var 3) (Var 4))
+
+-- test for apply
+test11 :: BDD
+test11 = (fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (4, Just 2, Just 0)), (4, (4, Just 0, Just 2)), (5, (3, Just 3, Just 4)), (6, (2, Just 5, Just 0)), (7, (2, Just 0, Just 5)), (8, (1, Just 6, Just 7))],
+          fromList  [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((4, Just 2, Just 0), 3), ((4, Just 0, Just 2), 4), ((3, Just 3, Just 4), 5), ((2, Just 5, Just 0), 6), ((2, Just 0, Just 5), 7), ((1, Just 6, Just 7), 8)]) 
+
+test12 :: BDD
+test12 = (fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (3, Just 2, Just 0)), (4, (3, Just 0, Just 2)), (5, (1, Just 3, Just 4))], fromList [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((3, Just 2, Just 1), 3), ((3, Just 0, Just 2), 4), ((1, Just 3, Just 4), 5)])
+
+-- test for build and apply
+--test21 = build $ Eq (Var 1) (Var 2)
+--test22 = build $ Eq (Var 3) (Var 4)
+-- you would have to keep additionally the number of variables in each bdd

@@ -149,6 +149,36 @@ evalOp u1 u2 op =
     b1 = u1 == 1
     b2 = u2 == 1
 
+countVar :: BDDNode -> Variable
+countVar ((t, _), u) = v
+  where
+    (v, _, _) = t ! u
+
+countLow :: BDDNode -> Node
+countLow ((t, _), u) = v
+  where
+    (_, Just v, _) = t ! u
+
+countHigh :: BDDNode -> Node
+countHigh ((t, _), u) = v
+  where
+    (_, _, Just v) = t ! u
+
+
+satCount :: BDDNode -> Int
+satCount (bdd@(t, _), node) =
+  2^(vNode - 1) * (count node) 
+  where
+    (vNode, _, _) = t ! node
+    count u =
+      if u == 0 then 0
+      else if u == 1 then 1
+           else 2^(countVar (bdd, countLow (bdd, u)) - countVar (bdd, u) - 1)
+                * count (countLow (bdd, u))
+                +  2^(countVar (bdd, countHigh (bdd, u)) - countVar (bdd, u) - 1)
+                * count (countHigh (bdd, u))
+
+
 -- test for build
 test0 = And (Eq (Var 1) (Var 2)) (Eq (Var 3) (Var 4))
 

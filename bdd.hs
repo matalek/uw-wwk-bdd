@@ -65,6 +65,7 @@ calculate (Imp e1 e2) =
   calculate $ Or (Neg e1) e2
 calculate (Eq e1 e2) =
   calculate $ And (Imp e1 e2) (Imp e2 e1)
+calculate e = error $ show e
 
 -- Assuming, that no values are assigned
 maxVar :: BExp -> Int
@@ -83,22 +84,21 @@ initBDD n =
   where
     v = (n, Nothing, Nothing)
 
-build :: BExp -> BDDNode
-build b = let
-  n = maxVar b + 1
-  v = (n, Nothing, Nothing)
+build :: BExp -> Int -> BDDNode
+build b n = let
+  v = (n + 1, Nothing, Nothing)
   in
-    buildAux b (fromList [(0, v), (1, v)], Map.empty) 1
+    buildAux b n (fromList [(0, v), (1, v)], Map.empty) 1
 
-buildAux :: BExp -> BDD -> Variable -> BDDNode
-buildAux b bdd@(t, h) i
-  | i > maxVar b =
+buildAux :: BExp -> Int -> BDD -> Variable -> BDDNode
+buildAux b n bdd@(t, h) i
+  | i > n =
     if calculate b == False then (bdd, 0)
     else (bdd, 1)
   | otherwise =
     let
-      (bdd1, v0) = buildAux (assign b i False) bdd (i + 1)
-      (bdd2, v1) = buildAux (assign b i True) bdd1 (i + 1)
+      (bdd1, v0) = buildAux (assign b i False) n bdd (i + 1)
+      (bdd2, v1) = buildAux (assign b i True) n bdd1 (i + 1)
     in mk bdd2 i v0 v1
 
 type Arr2D = Map (Node, Node) Node
@@ -205,6 +205,21 @@ anySat (bdd, u) =
               ((countVar (bdd, u), True) : anySat (bdd, countHigh (bdd, u)))
             else ((countVar (bdd, u), False) : anySat (bdd, countLow (bdd, u)))
 
+
+createH :: Map Int Triple -> Map Triple Int
+createH t = fromList $ Prelude.map (\(a,b) -> (b,a)) $ toList t
+
+rename :: BDDNode -> [Variable] -> [Variable] -> BDDNode
+rename ((t, h), u) old new =
+  let
+    rep = fromList $ zip old new
+    f (v, low, high)
+          | member v rep = Just (rep ! v, low, high)
+          | otherwise = Just (v, low, high)
+    newT = mapMaybe f t
+    newH = createH newT
+  in ((newT, newH), u)
+  
 
 -- test for build
 test0 = And (Eq (Var 1) (Var 2)) (Eq (Var 3) (Var 4))

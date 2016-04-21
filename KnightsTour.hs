@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module KnightsTour where
 import BDD
 
@@ -30,21 +31,33 @@ transitions b1@(n, _) b2 =
   let
     positions = [((i, j), (k, l)) |
                  i <- [0..n-1], j <- [0..n-1], k <- [0..n-1], l <- [0..n-1],
-                 ((abs (i-k) == 1 && abs (j-l) == 2) || (abs (i-k) == 2 && abs (j-l) == 1))]
+                 ((abs (i-k) == 1 && abs (j-l) == 1) || (abs (i-k) == 1 && abs (j-l) == 1))]
   in
-    foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val True) positions
+    foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val False) positions
 
-{-reachable :: Int -> BExp -> BDD
+reachable :: Int -> BExp -> IO BDDNode
 reachable n start =
-  reachableAux n start (build (Val False))
+  reachableAux n (build start (2*n*n)) (build (Val True) (2*n*n))
 
-reachableAux :: Int -> BExp -> BDD -> BDD
+reachableAux :: Int -> BDDNode -> BDDNode -> IO BDDNode
 reachableAux n start last =
   let
-    and = And (transitions (n, 0) (n, n)) last
-    m = (Val False)
-    cur = Or start m
-  in
+    t = build (transitions (n, 1) (n, n*n + 1)) (2*n*n)
+    and =  apply t last (&&)
+    m = foldl (\acc v -> apply (restrict acc v True) (restrict acc v False) (||)) and [0..n-1]
+    newM = rename m [n*n+1..2*n*n] [1..n*n]
+    cur = apply start newM (||)
+  in do
+    putStrLn $ show $ snd cur
     if cur /= last then reachableAux n start cur
     else return cur
--}
+
+knight :: Int -> IO BDDNode
+knight n =
+  let
+    s = (Var $ variable (n, 1) (0,0))
+    rest = [x | x <- variables (n,1) , x /= 0]
+    start = foldl (\exp v -> And exp (Neg (Var v))) s rest
+    fin = reachable n start
+  in
+    fin

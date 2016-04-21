@@ -19,7 +19,7 @@ type Triple = (Int, Edge, Edge)
 type BDD = (Map Int Triple, Map Triple Int)
 type BDDNode = (BDD, Node)
 
-mk :: BDD -> Int -> Node -> Node -> (BDD, Node)
+mk :: BDD -> Int -> Node -> Node -> BDDNode
 mk bdd@(t, h) i low high
   | low == high = (bdd, low)
   | member (i, Just low, Just high) h = (bdd, h ! (i, Just low, Just high))
@@ -83,14 +83,14 @@ initBDD n =
   where
     v = (n, Nothing, Nothing)
 
-build :: BExp -> BDD
+build :: BExp -> BDDNode
 build b = let
   n = maxVar b + 1
   v = (n, Nothing, Nothing)
   in
-    fst $ buildAux b (fromList [(0, v), (1, v)], Map.empty) 1
+    buildAux b (fromList [(0, v), (1, v)], Map.empty) 1
 
-buildAux :: BExp -> BDD -> Variable -> (BDD, Node)
+buildAux :: BExp -> BDD -> Variable -> BDDNode
 buildAux b bdd@(t, h) i
   | i > maxVar b =
     if calculate b == False then (bdd, 0)

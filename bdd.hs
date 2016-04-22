@@ -1,5 +1,6 @@
 module BDD where
 import Data.Map as Map
+import Data.Set as Set
 
 type Value = Bool
 type Variable = Int
@@ -22,12 +23,12 @@ type BDDNode = (BDD, Node)
 mk :: BDD -> Int -> Node -> Node -> BDDNode
 mk bdd@(t, h) i low high
   | low == high = (bdd, low)
-  | member (i, Just low, Just high) h = (bdd, h ! (i, Just low, Just high))
+  | Map.member (i, Just low, Just high) h = (bdd, h ! (i, Just low, Just high))
   | otherwise =
     let 
-      u = if size t > 0 then (fst $ findMax t) + 1 else 1
-      newT = insert u (i, Just low, Just high) t
-      newH = insert (i, Just low, Just high) u h
+      u = if Map.size t > 0 then (fst $ Map.findMax t) + 1 else 1
+      newT = Map.insert u (i, Just low, Just high) t
+      newH = Map.insert (i, Just low, Just high) u h
     in
       ((newT, newH), u)
 
@@ -80,7 +81,7 @@ maxVar (Eq e1 e2) = max (maxVar e1) $ maxVar e2
 
 initBDD :: Variable  -> BDD
 initBDD n =
-  (fromList [(0, v), (1, v)], Map.empty)
+  (Map.fromList [(0, v), (1, v)], Map.empty)
   where
     v = (n, Nothing, Nothing)
 
@@ -88,7 +89,7 @@ build :: BExp -> Int -> BDDNode
 build b n = let
   v = (n + 1, Nothing, Nothing)
   in
-    buildAux b n (fromList [(0, v), (1, v)], Map.empty) 1
+    buildAux b n (Map.fromList [(0, v), (1, v)], Map.empty) 1
 
 buildAux :: BExp -> Int -> BDD -> Variable -> BDDNode
 buildAux b n bdd@(t, h) i
@@ -105,7 +106,7 @@ type Arr2D = Map (Node, Node) Node
 type Op = Bool -> Bool -> Bool
 
 countVariables :: BDD -> Int
-countVariables (t, _) = maximum [v | (_, (v, _, _)) <- toList t]  
+countVariables (t, _) = maximum [v | (_, (v, _, _)) <- Map.toList t]  
 
 apply :: BDDNode -> BDDNode -> Op -> BDDNode
 apply (b1, u1) (b2, u2) op =
@@ -122,13 +123,13 @@ app :: BDD -> BDD -> Op -> Node -> Node -> BDD ->  Arr2D -> (BDD, Node, Arr2D)
 app bdd1@(t1, h1) bdd2@(t2, h2) op u1 u2 res g =
   let
     (res', u', g') =
-      if member (u1, u2) g then (res, g ! (u1, u2), g)
+      if Map.member (u1, u2) g then (res, g ! (u1, u2), g)
       else if u1 < 2 && u2 < 2 then (res, evalOp u1 u2 op, g)
            else if v1 == v2 then mkApp v1 low1 low2 high1 high2
                 else if v1 < v2 then mkApp v1 low1 u2 high1 u2
                      else mkApp v2 u1 low2 u1 high2
   in
-    (res', u', insert (u1, u2) u' g')
+    (res', u', Map.insert (u1, u2) u' g')
   where
     (v1, _, _) = t1 ! u1
     (v2, _, _) = t2 ! u2
@@ -207,30 +208,52 @@ anySat (bdd, u) =
 
 
 createH :: Map Int Triple -> Map Triple Int
-createH t = fromList $ Prelude.map (\(a,b) -> (b,a)) $ toList t
+createH t = Map.fromList $ Prelude.map (\(a,b) -> (b,a)) $ Map.toList t
 
 rename :: BDDNode -> [Variable] -> [Variable] -> BDDNode
 rename ((t, h), u) old new =
   let
-    rep = fromList $ zip old new
+    rep = Map.fromList $ zip old new
     f (v, low, high)
-          | member v rep = Just (rep ! v, low, high)
+          | Map.member v rep = Just (rep ! v, low, high)
           | otherwise = Just (v, low, high)
     newT = mapMaybe f t
     newH = createH newT
   in ((newT, newH), u)
   
 
+countNodes :: BDDNode -> Int
+countNodes (bdd, u) =
+  Set.size $ countNodesAux bdd u Set.empty
+
+countNodesAux :: BDD -> Int -> Set.Set Int -> Set.Set Int
+countNodesAux bdd@(t, _) u vis =
+  if Set.member u vis then vis
+  else
+    let
+      (_, low, high) = t ! u
+      vis' = Set.insert u vis
+      vis'' = case low of 
+        (Just l) -> countNodesAux bdd l vis'
+        _ -> vis'
+      vis''' = case high of 
+        (Just l) -> countNodesAux bdd l vis''
+        _ -> vis''
+    in
+      vis'''
+      
+    
+
 -- test for build
 test0 = And (Eq (Var 1) (Var 2)) (Eq (Var 3) (Var 4))
 
 -- test for apply
 test11 :: BDD
-test11 = (fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (4, Just 2, Just 0)), (4, (4, Just 0, Just 2)), (5, (3, Just 3, Just 4)), (6, (2, Just 5, Just 0)), (7, (2, Just 0, Just 5)), (8, (1, Just 6, Just 7))],
-          fromList  [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((4, Just 2, Just 0), 3), ((4, Just 0, Just 2), 4), ((3, Just 3, Just 4), 5), ((2, Just 5, Just 0), 6), ((2, Just 0, Just 5), 7), ((1, Just 6, Just 7), 8)]) 
+test11 = (Map.fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (4, Just 2, Just 0)), (4, (4, Just 0, Just 2)), (5, (3, Just 3, Just 4)), (6, (2, Just 5, Just 0)), (7, (2, Just 0, Just 5)), (8, (1, Just 6, Just 7))],
+          Map.fromList  [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((4, Just 2, Just 0), 3), ((4, Just 0, Just 2), 4), ((3, Just 3, Just 4), 5), ((2, Just 5, Just 0), 6), ((2, Just 0, Just 5), 7), ((1, Just 6, Just 7), 8)]) 
 
 test12 :: BDD
-test12 = (fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (3, Just 2, Just 0)), (4, (3, Just 0, Just 2)), (5, (1, Just 3, Just 4))], fromList [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((3, Just 2, Just 1), 3), ((3, Just 0, Just 2), 4), ((1, Just 3, Just 4), 5)])
+test12 = (Map.fromList [(0, (6, Nothing, Nothing)), (1, (6, Nothing, Nothing)), (2, (5, Just 1, Just 0)), (3, (3, Just 2, Just 0)), (4, (3, Just 0, Just 2)), (5, (1, Just 3, Just 4))], Map.fromList [((6, Nothing, Nothing), 0), ((6, Nothing, Nothing), 1), ((5, Just 1, Just 0), 2), ((3, Just 2, Just 1), 3), ((3, Just 0, Just 2), 4), ((1, Just 3, Just 4), 5)])
 
 -- test for build and apply
 --test21 = build $ Eq (Var 1) (Var 2)

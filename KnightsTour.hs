@@ -31,32 +31,32 @@ transitions b1@(n, _) b2 =
   let
     positions = [((i, j), (k, l)) |
                  i <- [0..n-1], j <- [0..n-1], k <- [0..n-1], l <- [0..n-1],
-                 ((abs (i-k) == 2 && abs (j-l) == 2) || (abs (i-k) == 2 && abs (j-l) == 2))]
+                 ((abs (i-k) == 1 && abs (j-l) == 0) || (abs (i-k) == 0 && abs (j-l) == 1))]
   in
     foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val False) positions
 
-reachable :: Int -> BExp -> BDDNode -> IO BDDNode
+reachable :: Int -> BExp -> BDDNode -> BDDNode
 reachable n start trans =
   reachableAux n (build start (2*n*n)) (build start (2*n*n)) trans
 
-reachableAux :: Int -> BDDNode -> BDDNode -> BDDNode -> IO BDDNode
+reachableAux :: Int -> BDDNode -> BDDNode -> BDDNode -> BDDNode
 reachableAux n start last trans =
   let
     and =  apply trans last (&&)
     m = foldl (\acc v -> apply (restrict acc v True) (restrict acc v False) (||)) and [1..n*n]
     newM = rename m [n*n+1..2*n*n] [1..n*n]
     cur = apply start newM (||)
-  in do
-    putStrLn "1"
+  in
     if cur /= last then reachableAux n start cur trans
-    else return cur
+    else cur
 
-knight :: Int -> IO Int
-knight n = do
-    let s = (Var $ variable (n, 1) (0,0))
-    let rest = [x | x <- variables (n,1) , x /= 1]
-    let start = foldl (\exp v -> And exp (Neg (Var v))) s rest
-    let trans = build (transitions (n, 1) (n, n*n + 1)) (2*n*n)
-    fin <- reachable n start trans
-    putStrLn "2"
-    return $ div (satCount fin) (2^(n*n))
+knight :: Int -> Int
+knight n =
+  let
+    s = (Var $ variable (n, 1) (0,0))
+    rest = [x | x <- variables (n,1) , x /= 1]
+    start = foldl (\exp v -> And exp (Neg (Var v))) s rest
+    trans = build (transitions (n, 1) (n, n*n + 1)) (2*n*n)
+    fin = reachable n start trans
+  in
+    div (satCount fin) (2^(n*n))

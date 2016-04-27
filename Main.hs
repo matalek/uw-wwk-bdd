@@ -4,5 +4,5 @@ import KnightsTour
 
 main :: IO ()
 main = do
-  res <- knight 3
+  let res = knight 3
   putStrLn $ show res

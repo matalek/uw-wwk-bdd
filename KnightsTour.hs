@@ -31,7 +31,7 @@ transitions b1@(n, _) b2 =
   let
     positions = [((i, j), (k, l)) |
                  i <- [0..n-1], j <- [0..n-1], k <- [0..n-1], l <- [0..n-1],
-                 ((abs (i-k) == 1 && abs (j-l) == 2) || (abs (i-k) == 2 && abs (j-l) == 1))]
+                 ((abs (i-k) == 2 && abs (j-l) == 2) || (abs (i-k) == 2 && abs (j-l) == 2))]
   in
     foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val False) positions
 
@@ -47,8 +47,7 @@ reachableAux n start last trans =
     newM = rename m [n*n+1..2*n*n] [1..n*n]
     cur = apply start newM (||)
   in do
-    putStrLn $ show $ anySat and
-    putStrLn ""
+    putStrLn "1"
     if cur /= last then reachableAux n start cur trans
     else return cur
 
@@ -59,4 +58,5 @@ knight n = do
     let start = foldl (\exp v -> And exp (Neg (Var v))) s rest
     let trans = build (transitions (n, 1) (n, n*n + 1)) (2*n*n)
     fin <- reachable n start trans
+    putStrLn "2"
     return $ div (satCount fin) (2^(n*n))

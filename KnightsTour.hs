@@ -9,7 +9,7 @@ type Position = (Int, Int)
 type Board = (Int, Int) -- (size, start variable)
 
 variable  :: Board -> Position -> Int
-variable (n, s) (i, j) = s + n * i + j
+variable (n, s) (i, j) = s + 2 * (n * i + j)
 
 variables :: Board -> [Int]
 variables b@(n, s) =
@@ -43,8 +43,8 @@ reachableAux :: Int -> BDDNode -> BDDNode -> BDDNode -> BDDNode
 reachableAux n start last trans =
   let
     and =  apply trans last (&&)
-    m = foldl (\acc v -> apply (restrict acc v True) (restrict acc v False) (||)) and [1..n*n]
-    newM = rename m [n*n+1..2*n*n] [1..n*n]
+    m = foldl (\acc v -> apply (restrict acc v True) (restrict acc v False) (||)) and [2*x - 1 | x<- [1..n*n] ]
+    newM = rename m [2*x | x <- [1..n*n]] [2*x-1 | x<- [1..n*n]]
     cur = apply start newM (||)
   in
     if cur /= last then reachableAux n start cur trans
@@ -56,7 +56,7 @@ knight n =
     s = (Var $ variable (n, 1) (0,0))
     rest = [x | x <- variables (n,1) , x /= 1]
     start = foldl (\exp v -> And exp (Neg (Var v))) s rest
-    trans = build (transitions (n, 1) (n, n*n + 1)) (2*n*n)
+    trans = build (transitions (n, 1) (n, 2)) (2*n*n)
     fin = reachable n start trans
   in
     div (satCount fin) (2^(n*n))

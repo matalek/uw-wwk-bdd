@@ -1,4 +1,4 @@
-module BDD where
+module BDD(BDDNode, BExp(..), mk, build, apply, restrict, satCount, anySat, rename) where
 import Data.HashMap.Lazy as Map
 import Data.Set as Set
 

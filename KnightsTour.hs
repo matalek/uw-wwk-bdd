@@ -31,7 +31,7 @@ transitions b1@(n, _) b2 =
   let
     positions = [((i, j), (k, l)) |
                  i <- [0..n-1], j <- [0..n-1], k <- [0..n-1], l <- [0..n-1],
-                 ((abs (i-k) == 4 && abs (j-l) == 4) || (abs (i-k) == 4 && abs (j-l) == 4))]
+                 ((abs (i-k) == 2 && abs (j-l) == 1) || (abs (i-k) == 1 && abs (j-l) == 2))]
   in
     foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val False) positions
 

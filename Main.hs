@@ -8,5 +8,5 @@ main :: IO ()
 main = do
   --let ((m, _), _) = build (transitions (4, 1) (4, 2)) 32
   --putStrLn $ show $ Data.Map.size m
-  let res = knight 3
+  let res = knight 4
   putStrLn $ show res

@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module KnightsTour where
+module KnightsTour(knight) where
 import BDD
 
 solve :: Int -> Bool
@@ -15,7 +15,7 @@ variables :: Board -> [Int]
 variables b@(n, s) =
   [variable b (i, j) | i <- [0..n - 1], j <- [0..n - 1]]
 
-
+-- Creates single transition from one position to another
 move ::  Board ->  Position -> Board -> Position -> BExp
 move b1 a@(i, j) b2 b@(k, l) =
    let
@@ -25,7 +25,8 @@ move b1 a@(i, j) b2 b@(k, l) =
      fields2 = [x | x <- variables b2, x /= (variable b2 a), x /= (variable b2 b)]
      rest = foldl (\exp (v1, v2) -> And exp (Eq (Var v1) (Var v2))) (Val True) $ zip fields1 fields2
    in And (And old new) rest
-    
+
+-- Represents all possible transitions of knight between two boards
 transitions :: Board -> Board -> BExp
 transitions b1@(n, _) b2 =
   let
@@ -35,6 +36,7 @@ transitions b1@(n, _) b2 =
   in
     foldl (\exp (a, b) -> Or exp $ move b1 a b2 b) (Val False) positions
 
+-- Calculates the set of reachable positions on board
 reachable :: Int -> BExp -> BDDNode -> BDDNode
 reachable n start trans =
   reachableAux n (build start (2*n*n)) (build start (2*n*n)) trans
@@ -50,7 +52,9 @@ reachableAux n start last trans =
     if cur /= last then reachableAux n start cur trans
     else cur
 
-knight :: Int -> Int
+-- Based on the size of the board, calculates whether knights positioned in one of the
+-- corners will visit all positions on board
+knight :: Int -> Bool
 knight n =
   let
     s = (Var $ variable (n, 1) (0,0))
@@ -58,5 +62,6 @@ knight n =
     start = foldl (\exp v -> And exp (Neg (Var v))) s rest
     trans = build (transitions (n, 1) (n, 2)) (2*n*n)
     fin = reachable n start trans
+    cntVis = div (satCount fin) (2^(n*n))
   in
-    div (satCount fin) (2^(n*n))
+    n*n == cntVis

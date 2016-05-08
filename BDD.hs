@@ -264,3 +264,9 @@ runTest1 = BDD.print $ apply test11 test12 (&&)
 -- Test for restrict (p. 20)
 test2 = Or (Eq (Var 1) (Var 2)) (Var 3)
 runTest2 = BDD.print $ restrict (build test2 3) 2 False
+
+-- Test for satCount (correct answer: 6)
+runTest3 = satCount $ build test2 3
+
+-- Test for anyCount (for example: [(1, False), (2, False)]
+runTest4 = anySat $ build test2 3

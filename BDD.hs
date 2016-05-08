@@ -1,5 +1,5 @@
-module BDD(BDDNode, BExp(..), mk, build, apply, restrict, satCount, anySat, rename) where
-import Data.HashMap.Lazy as Map
+module BDD(BDD, BDDNode, BExp(..), mk, build, apply, restrict, satCount, anySat, rename) where
+import Data.Map.Lazy as Map
 import Data.Set as Set
 
 type Value = Bool
@@ -17,7 +17,7 @@ data BExp = Var Variable
 
 type Triple = (Int, Edge, Edge)
 
-type BDD = (HashMap Int Triple, HashMap Triple Int)
+type BDD = (Map Int Triple, Map Triple Int)
 type BDDNode = (BDD, Node)
 
 mk :: BDD -> Int -> Node -> Node -> BDDNode
@@ -102,7 +102,7 @@ buildAux b n bdd@(t, h) i
       (bdd2, v1) = buildAux (assign b i True) n bdd1 (i + 1)
     in mk bdd2 i v0 v1
 
-type Arr2D = HashMap (Node, Node) Node
+type Arr2D = Map (Node, Node) Node
 type Op = Bool -> Bool -> Bool
 
 countVariables :: BDD -> Int
@@ -207,7 +207,7 @@ anySat (bdd, u) =
             else ((countVar (bdd, u), False) : anySat (bdd, countLow (bdd, u)))
 
 
-createH :: HashMap Int Triple -> HashMap Triple Int
+createH :: Map Int Triple -> Map Triple Int
 createH t = Map.fromList $ Prelude.map (\(a,b) -> (b,a)) $ Map.toList t
 
 rename :: BDDNode -> [Variable] -> [Variable] -> BDDNode
